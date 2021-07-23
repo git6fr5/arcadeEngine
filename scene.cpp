@@ -2,6 +2,7 @@
 // compile with g++ scene.cpp -o scene -lSDL2
 #define SDL_MAIN_HANDLED
 #include <iostream>
+#include <math.h>
 #include <SDL.h>
 #include <C:\Users\git6f\arcadeEngine\arcade.cpp>
 #include <C:\Users\git6f\arcadeEngine\physics.cpp>
@@ -19,7 +20,7 @@ class Arcade::Scene {
 		bool isRunning;
 		Object objects[50];
 		int objectCount = 0;
-		Vector2 gravity{ 0, 0 };
+		Vector2 gravity{ 0, 50 };
 		SDL_Renderer* renderer;
 
 		void run() {
@@ -33,14 +34,16 @@ class Arcade::Scene {
 			renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
 			// initializes the time parameters
+			Uint32 startTime = SDL_GetTicks();
 			Uint32 previousTime = SDL_GetTicks();
 			Uint32 currentTime = previousTime;
 			float timeInterval = 0;
+			float totalTime = 0;
 
 			// add gravity to all the initialized objects
-			for (int i = 0; i < objectCount; i++) {
+			/*for (int i = 0; i < objectCount; i++) {
 				objects[i].motion.addForce(gravity.scalarTransform(objects[i].motion.mass));
-			}
+			}*/
 
 			// tracks the events
 			SDL_Event event;
@@ -50,7 +53,8 @@ class Arcade::Scene {
 				// updates the times
 				previousTime = currentTime;
 				currentTime = SDL_GetTicks();
-				timeInterval = (currentTime - previousTime) / 1000.0;
+				timeInterval = (currentTime - previousTime) / 250.0;
+				totalTime = totalTime + timeInterval;
 
 				while (SDL_PollEvent(&event))
 				{
@@ -58,8 +62,20 @@ class Arcade::Scene {
 						isRunning = false;
 				}
 
+				// for fun
+				for (int i = 0; i < objectCount; i++) {
+					if (i % 2 == 0) {
+						objects[i].motion.setForce(0, gravity.scalarTransform(objects[i].motion.mass * sin(M_PI / 2 + totalTime)));
+					}
+					else {
+						objects[i].motion.setForce(0, gravity.scalarTransform(objects[i].motion.mass * -sin(M_PI / 2 + totalTime)));
+					}
+				}
+
 				// do we need to update if timeInterval == 0?
 				onUpdate(timeInterval);
+
+				//isRunning = false;
 
 			}
 		}
@@ -77,7 +93,14 @@ class Arcade::Scene {
 			for (int i = 0; i < objectCount; i++) {
 				for (int j = 0; j < objectCount; j++) {
 					if (i != j) {
-						objects[i].checkCollision(objects[j]);
+						bool collided = objects[i].checkCollision(objects[j]);
+						if (collided) {
+							//cout << "colliding";
+							objects[i].shape.color[0] = 0xFF;
+						}
+						else {
+							objects[i].shape.color[0] = 0x00;
+						}
 					}
 				}
 			}
@@ -100,7 +123,8 @@ class Arcade::Scene {
 		void renderPolygon(Object object) {
 
 			// set the color
-			SDL_SetRenderDrawColor(renderer, 0x00, 0xFF, 0x00, 0xFF);
+			unsigned char* color = object.shape.color;
+			SDL_SetRenderDrawColor(renderer, color[0], color[1], color[2], color[3]);
 
 			// draw the shape
 			SDL_RenderDrawLines(renderer, object.shape.polygonToPoints(object.motion.position), object.shape.polyCount + 1);
@@ -256,14 +280,21 @@ class Arcade::Scene {
 int main() {
 
 	Scene scene;
-	scene.createSquareObject(50, 1, 0, Vector2{ float(ScreenWidth)/2, 50 }, Vector2{}, true);
+	/*scene.createSquareObject(50, 1, 0, Vector2{ float(ScreenWidth)/2 + 10, 180 }, Vector2{}, true);
+	scene.objects[0].shape.rotateShape(30);
+	scene.createSquareObject(50, 1, 0, Vector2{ float(ScreenWidth) / 2 - 30, 230 }, Vector2{}, true);
+	scene.objects[1].shape.rotateShape(-30);*/
+
+	scene.createSquareObject(50, 1, 0, Vector2{ float(ScreenWidth) / 2, 180 }, Vector2{}, true);
+	scene.createSquareObject(50, 1, 0, Vector2{ float(ScreenWidth) / 2, 230 }, Vector2{}, true);
+
 	// scene.createSquareObject(100, 1, 0, Vector2{ float(ScreenWidth) / 2, 400 }, Vector2{}, false);
 
-	scene.createCircleObject(50, 1, 0, Vector2{ float(ScreenWidth)/2 + 100, 50 }, Vector2{}, true);
-	scene.createPolygonObject(7, 50, 1, 0, Vector2{ float(ScreenWidth) / 2 + 250, 50 }, Vector2{}, true);
+	//scene.createCircleObject(50, 1, 0, Vector2{ float(ScreenWidth)/2 + 100, 50 }, Vector2{}, true);
+	//scene.createPolygonObject(7, 50, 1, 0, Vector2{ float(ScreenWidth) / 2 + 250, 50 }, Vector2{}, true);
 	// scene.createRectangleObject(50, 100, 1, 0, Vector2{ float(ScreenWidth) / 2 - 250, 50 }, Vector2{}, false);
 
-	scene.createRectangleObject(20, ScreenWidth * 2, 1, 0, Vector2{ float(ScreenWidth) / 2, 450 }, Vector2{}, false);
+	//scene.createRectangleObject(20, ScreenWidth * 2, 1, 0, Vector2{ float(ScreenWidth) / 2, 450 }, Vector2{}, false);
 
 	cout << scene.objectCount << "\n";
 

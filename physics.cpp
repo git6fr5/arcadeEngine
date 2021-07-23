@@ -24,10 +24,15 @@ class Physics::Vector2 {
 			return "(" + to_string(x).substr(0, 4) + ", " + to_string(y).substr(0, 4) + ")";
 		}
 
+
 		float magnitude(Vector2 v = Vector2{}) {
 			float xSeperation = x - v.x;
 			float ySeperation = y - v.y;
 			return sqrt(xSeperation * xSeperation + ySeperation * ySeperation);
+		}
+
+		float dot(Vector2 v) {
+			return x * v.x + y * v.y;
 		}
 
 		Vector2 normalize() {
@@ -42,7 +47,6 @@ class Physics::Vector2 {
 			float yRotated = x * sin(angle) + y * cos(angle);
 			return Vector2{ xRotated, yRotated };
 		}
-
 
 		Vector2 translate(Vector2 v) {
 			return Vector2{ x + v.x, y + v.y };
@@ -72,6 +76,7 @@ class Physics::Shape {
 		SDL_Point points[50];
 		SDL_Point normalPoints[100];
 		int polyCount;
+		unsigned char color[4] = { 0x00, 0xFF, 0x00, 0xFF };
 
 		void calculateAllNormals() {
 			for (int i = 0; i < polyCount; i++) {
@@ -163,6 +168,7 @@ class Physics::Shape {
 			for (int i = 0; i < polyCount; i++) {
 				output += normals[i].toString() + ", ";
 			}
+			output += "\n";
 			return output;
 		}
 
@@ -195,6 +201,17 @@ class Physics::Motion {
 			return velocity;
 		}
 
+		int setForce(int index, Vector2 newForce) {
+			// add a force to act on this motion
+			if (index < forceCount) {
+				forces[index] = newForce;
+			}
+			else {
+				addForce(newForce);
+			}
+			return forceCount;
+		}
+
 		int addForce(Vector2 newForce) {
 			// add a force to act on this motion
 			forces[forceCount] = newForce;
@@ -221,7 +238,7 @@ class Physics::Motion {
 
 			// updates the vectors of this motion
 			// with respect to the time passed since last update
-			updateAcceleration(timeInterval);
+			updateAcceleration();
 			updateVelocity(timeInterval);
 			updatePosition(timeInterval);
 		}
@@ -248,7 +265,7 @@ class Physics::Motion {
 			return velocity;
 		}
 
-		Vector2 updateAcceleration(float timeInterval) {
+		Vector2 updateAcceleration() {
 			// account for drag
 			// but basically
 			acceleration = Vector2{ 0, 0 };
