@@ -11,16 +11,16 @@
 using namespace std;
 using namespace Arcade;
 
-int ScreenWidth = 640;
-int ScreenHeight = 480;
+int ScreenWidth = int(1680 / 2);
+int ScreenHeight = int(920 / 2);
 
 class Arcade::Scene {
 
 	public:
 		bool isRunning;
-		Object objects[50];
+		Object objects[100];
 		int objectCount = 0;
-		Vector2 gravity{ 0, 0 };
+		Vector2 gravity{ 0, 1 };
 		SDL_Renderer* renderer;
 
 		void run() {
@@ -63,13 +63,31 @@ class Arcade::Scene {
 				// updates the times
 				previousTime = currentTime;
 				currentTime = SDL_GetTicks();
-				timeInterval = (currentTime - previousTime) / 1000.0;
+				timeInterval = (currentTime - previousTime) / 500.0;
 				totalTime = totalTime + timeInterval;
 
 				while (SDL_PollEvent(&event))
 				{
 					if (event.type == SDL_QUIT)
 						isRunning = false;
+				}
+
+				// for fun
+				/*for (int i = 0; i < objectCount; i++) {
+					if (i % 2 == 0) {
+						objects[i].motion.setForce(0, gravity.scalarTransform(objects[i].motion.mass * sin(M_PI / 2 + totalTime))); // s
+					}
+					else {
+						objects[i].motion.setForce(0, gravity.scalarTransform(objects[i].motion.mass * -sin(M_PI / 2 + totalTime))); // 
+					}
+				}*/
+
+				/*for (int i = 0; i < objectCount; i++) {
+					objects[i].motion.setForce(0, gravity.rotate(float(int(100 * totalTime) % 360)));
+				}*/
+
+				for (int i = 0; i < objectCount; i++) {
+					objects[i].motion.setForce(0, objects[i].motion.position.scalarTransform(-1).translate(Vector2{ float(ScreenWidth / 2), float(ScreenHeight / 2) }).scalarTransform(gravity.magnitude()));
 				}
 
 				// do we need to update if timeInterval == 0?
@@ -107,6 +125,10 @@ class Arcade::Scene {
 				objects[i].onUpdate(timeInterval);
 			}
 
+			for (int i = 0; i < objectCount; i++) {
+				objects[i].checkBounds(ScreenWidth, ScreenHeight);
+			}
+
 			// clears the frame
 			SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xFF);
 			SDL_RenderClear(renderer);
@@ -115,7 +137,7 @@ class Arcade::Scene {
 			for (int i = 0; i < objectCount; i++) {
 				renderPolygon(objects[i]);
 				//renderNormals(objects[i]);
-				renderMotion(objects[i]);
+				//renderMotion(objects[i]);
 			}
 
 			// cout << objects[0].motion.forces[0].toString() << "\t" << objects[1].motion.forces[0].toString() << "\n";
@@ -300,13 +322,30 @@ class Arcade::Scene {
 int main() {
 
 	Scene scene;
-	scene.createCircleObject(50, 1, 0, Vector2{ float(ScreenWidth)/2 + 10, 180 }, Vector2{0, 50}, true, true);
+	/*scene.createCircleObject(50, 1, 0, Vector2{ float(ScreenWidth)/2 + 10, 180 }, Vector2{0, 50}, true, true);
 	scene.objects[0].shape.rotateShape(30);
 	scene.createSquareObject(50, 1, 0, Vector2{ float(ScreenWidth) / 2 - 30, 230 }, Vector2{0, -50}, true, true);
-	scene.objects[1].shape.rotateShape(50);
+	scene.objects[1].shape.rotateShape(50);*/
 
-	scene.createCircleObject(50, 1, 0, Vector2{ float(ScreenWidth) / 2, 100 }, Vector2{0, 50}, true, true);
-	scene.createCircleObject(50, 1, 0, Vector2{ float(ScreenWidth) / 2, 300 }, Vector2{0, -50}, true, true);
+	//scene.createCircleObject(50, 1, 0, Vector2{ float(ScreenWidth) / 2, 100 }, Vector2{0, 50}, true, true);
+	//scene.createCircleObject(50, 1, 0, Vector2{ float(ScreenWidth) / 2, 300 }, Vector2{0, -50}, true, true);
+	//scene.createCircleObject(50, 1, 0, Vector2{ float(ScreenWidth) / 2, 300 }, Vector2{ 0, 0 }, true, true);
+
+
+	for (int i = 0; i < 75; i++) {
+		float size = 5 + float(rand() % 15);
+		scene.createPolygonObject(3 + rand() % 12, size, size/10, 0, 
+			Vector2{ float(rand() % ScreenWidth / 2) , float(rand() % ScreenHeight / 2) }, 
+			Vector2{ float(rand() % 200), float(rand() % 200) }, true, true);
+	}
+
+	// these dimensions are in backwards lol
+	// Object leftWall = scene.createRectangleObject(ScreenHeight, 50, 50, 0, Vector2{ float(ScreenWidth) - 30, float(ScreenHeight /2) }, Vector2{ 0, 0 }, true, true);
+	// Object rightWall = scene.createRectangleObject(ScreenHeight, 50, 50, 0, Vector2{ 30, float(ScreenHeight /2) }, Vector2{ 0, 0 }, true, true);
+
+	// Object topWall = scene.createRectangleObject(50, ScreenWidth, 50, 0, Vector2{ float(ScreenWidth) / 2, float(ScreenHeight) - 30 }, Vector2{ 0, 0 }, false, true);
+	// Object bottomWall = scene.createRectangleObject(50, ScreenWidth, 50, 0, Vector2{ float(ScreenWidth) / 2, 30 }, Vector2{ 0, 0 }, false, true);
+
 
 	// scene.createSquareObject(100, 1, 0, Vector2{ float(ScreenWidth) / 2, 400 }, Vector2{}, false);
 

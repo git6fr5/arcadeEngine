@@ -37,6 +37,11 @@ class Arcade::Object {
 			Vector2 objectBCenter = objectB.motion.position.translate(negativePosition);
 			Vector2 forceDirection = objectBCenter.scalarTransform(-1).normalize();
 
+			if (objectBCenter.magnitude() < (shape.length + objectB.shape.length)/2) {
+				float diff = ((shape.length + objectB.shape.length)/2 - objectBCenter.magnitude());
+				motion.position.translate(forceDirection.normalize().scalarTransform(diff));
+			}
+
 			// force = impulse = m * a
 			// do i need to account for angle of collision?
 			// yes, its the velocity in the direction of the collision
@@ -130,6 +135,33 @@ class Arcade::Object {
 			onCollision(objectB, timeInterval);
 
 			return true;
+		}
+
+		bool checkBounds(float horizontalBound, float verticalBound) {
+			float boundaryHit = false;
+			if (motion.position.x > horizontalBound - shape.length /2 ) {
+				motion.position.x = horizontalBound - shape.length /2;
+				boundaryHit = true;
+			}
+			else if (motion.position.x < shape.length/2) {
+				motion.position.x = shape.length/2;
+				boundaryHit = true;
+			}
+			if (motion.position.y > verticalBound - shape.length/2) {
+				motion.position.y = verticalBound - shape.length /2;
+				boundaryHit = true;
+			}
+			else if (motion.position.y < shape.length / 2) {
+				motion.position.y = shape.length / 2;
+				boundaryHit = true;
+			}
+			if (boundaryHit) {
+				motion.velocity.scalarTransform(-1);
+			}
+			if (motion.velocity.magnitude() > 300) {
+				motion.velocity = motion.velocity.normalize().scalarTransform(300);
+			}
+			return boundaryHit;
 		}
 
 		bool axisCollision(Vector2* polygonB, int polyCountB, Vector2 axis) {

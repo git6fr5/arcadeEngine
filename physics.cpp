@@ -103,7 +103,7 @@ class Physics::Shape {
 		}
 
 		void createCircle() {
-			createRegularPolygon(49);
+			createRegularPolygon(15);
 		}
 
 		int createRegularPolygon(int _polyCount) {
