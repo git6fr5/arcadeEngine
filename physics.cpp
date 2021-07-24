@@ -48,6 +48,12 @@ class Physics::Vector2 {
 			return Vector2{ xRotated, yRotated };
 		}
 
+		Vector2 project(Vector2 v) {
+			float scalar = Vector2{ x, y }.dot(v);
+			Vector2 normalizedV = v.normalize();
+			return normalizedV.scalarTransform(scalar);
+		}
+
 		Vector2 translate(Vector2 v) {
 			return Vector2{ x + v.x, y + v.y };
 		}
@@ -216,6 +222,8 @@ class Physics::Motion {
 			// add a force to act on this motion
 			forces[forceCount] = newForce;
 			forceCount++;
+			cout << "Adding a force" << "\n";
+			cout << forceCount << "\n";
 			return forceCount;
 		}
 

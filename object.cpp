@@ -19,9 +19,65 @@ class Arcade::Object {
 			// updates the motion of the object
 			// with respect to time passed since last update
 			motion.onUpdate(timeInterval);
+
+			// collision energy dissipation
+			motion.forces[1] = Vector2{ 0,0 };
 		}
 
-		bool checkCollision(Object objectB) {
+		void onCollision(Object objectB, float timeInterval) {
+			// causes some cool behavior
+			/*Vector2 negativePosition = motion.position.scalarTransform(-1);
+			Vector2 otherObjectCenter = objectB.motion.position.translate(negativePosition);
+			motion.setForce(1, otherObjectCenter.scalarTransform(100));*/
+
+			/*Vector2 otherObjectCenter = objectB.motion.position.translate(motion.position);
+			motion.setForce(1, otherObjectCenter.scalarTransform(-1));*/
+
+			Vector2 negativePosition = motion.position.scalarTransform(-1);
+			Vector2 objectBCenter = objectB.motion.position.translate(negativePosition);
+			Vector2 forceDirection = objectBCenter.scalarTransform(-1).normalize();
+
+			// force = impulse = m * a
+			// do i need to account for angle of collision?
+			// yes, its the velocity in the direction of the collision
+			// therefore
+
+			/*Vector2 accelerationProjection = objectB.motion.acceleration.project(forceDirection);
+			// force seems to be a bit too intense :(
+			Vector2 collisionForce = accelerationProjection.scalarTransform(objectB.motion.mass);*/
+
+			// THE VELOCITY IN THE FRAME OF THIS OBJECT IS THE RELATIVE VELOCITY?
+			Vector2 negativeVelocity = motion.velocity.scalarTransform(-1);
+			Vector2 objectBRelativeVelocity = negativeVelocity.translate(negativeVelocity);
+
+			Vector2 velocityProjection = objectBRelativeVelocity.project(forceDirection);
+			Vector2 collisionForce = velocityProjection.scalarTransform(objectB.motion.mass / timeInterval);
+
+			cout << collisionForce.toString() << "\n";
+
+			// f = m * -v' / t
+			// new v =  v + (f / m) * t
+			// new v = v + (-v' * m / t * m) * t
+			// new v = v - v'
+
+			// Vector2 collisionMomentum = velocityProjection.scalarTransform(objectB.motion.mass);
+
+			// force seems to be a bit too intense :(
+			// Vector2 collisionForce = velocityProjection.scalarTransform(objectB.motion.mass);
+
+			// force applied = m * delta v / t
+			// what is the delta v???
+
+			// add it to the current collision force
+			// Vector2 currentCollisionForce = motion.forces[1];
+			motion.setForce(1, collisionForce);
+			//motion.onUpdate(timeInterval);
+
+			// motion.velocity = motion.velocity.translate(collisionMomentum.scalarTransform(1 / motion.mass));
+
+		}
+
+		bool checkCollision(Object objectB, float timeInterval) {
 			// checks if the shapes of this object
 			// intersects with the shape of the given object
 
@@ -35,14 +91,14 @@ class Arcade::Object {
 			// need for projecting onto the normals
 			// we need some sense of the space between the two
 			Vector2 negativePosition = motion.position.scalarTransform(-1);
-			Vector2 otherObjectCenter = objectB.motion.position.translate(negativePosition);
+			Vector2 objectBCenter = objectB.motion.position.translate(negativePosition);
 
 			// translate other objects polygon points to relative space
 			Vector2 objectBRelativePolgygon[50];
 			//Vector2 otherObjectRelativeNormals[50]; // not sure if i need to do this
 
 			for (int i = 0; i < objectB.shape.polyCount; i++) {
-				objectBRelativePolgygon[i] = objectB.shape.polygon[i].translate(otherObjectCenter);
+				objectBRelativePolgygon[i] = objectB.shape.polygon[i].translate(objectBCenter);
 				//otherObjectRelativeNormals[i] = otherObject.shape.normals[i].translate(otherObjectCenter);
 			}
 			// note : we don't need to set the last polygon to the first because we aren't rendering these
@@ -70,6 +126,8 @@ class Arcade::Object {
 			}
 			
 			//cout << "GAP COUNT:" << gapCount << "\n";
+			// if the function hasn't returned by here, it means there was a collision
+			onCollision(objectB, timeInterval);
 
 			return true;
 		}

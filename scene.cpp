@@ -20,7 +20,7 @@ class Arcade::Scene {
 		bool isRunning;
 		Object objects[50];
 		int objectCount = 0;
-		Vector2 gravity{ 0, 50 };
+		Vector2 gravity{ 0, 0 };
 		SDL_Renderer* renderer;
 
 		void run() {
@@ -48,12 +48,22 @@ class Arcade::Scene {
 			// tracks the events
 			SDL_Event event;
 
+			// for fun
+			for (int i = 0; i < objectCount; i++) {
+				if (i % 2 == 0) {
+					objects[i].motion.setForce(0, gravity.scalarTransform(objects[i].motion.mass * 1)); // sin(M_PI / 2 + totalTime)
+				}
+				else {
+					objects[i].motion.setForce(0, gravity.scalarTransform(objects[i].motion.mass * -1)); // sin(M_PI / 2 + totalTime)
+				}
+			}
+
 			while (isRunning)
 			{
 				// updates the times
 				previousTime = currentTime;
 				currentTime = SDL_GetTicks();
-				timeInterval = (currentTime - previousTime) / 250.0;
+				timeInterval = (currentTime - previousTime) / 1000.0;
 				totalTime = totalTime + timeInterval;
 
 				while (SDL_PollEvent(&event))
@@ -62,18 +72,10 @@ class Arcade::Scene {
 						isRunning = false;
 				}
 
-				// for fun
-				for (int i = 0; i < objectCount; i++) {
-					if (i % 2 == 0) {
-						objects[i].motion.setForce(0, gravity.scalarTransform(objects[i].motion.mass * sin(M_PI / 2 + totalTime)));
-					}
-					else {
-						objects[i].motion.setForce(0, gravity.scalarTransform(objects[i].motion.mass * -sin(M_PI / 2 + totalTime)));
-					}
-				}
-
 				// do we need to update if timeInterval == 0?
-				onUpdate(timeInterval);
+				if (timeInterval != 0) {
+					onUpdate(timeInterval);
+				}
 
 				//isRunning = false;
 
@@ -82,18 +84,12 @@ class Arcade::Scene {
 
 		void onUpdate(float timeInterval) {
 
-			// updates all the objects in the scene
-			// with respect to the time passed since last update
-			for (int i = 0; i < objectCount; i++) {
-				objects[i].onUpdate(timeInterval);
-			}
-
 			// iterates through each pair of objects
 			// to check for collisions between them
 			for (int i = 0; i < objectCount; i++) {
 				for (int j = 0; j < objectCount; j++) {
 					if (i != j) {
-						bool collided = objects[i].checkCollision(objects[j]);
+						bool collided = objects[i].checkCollision(objects[j], timeInterval);
 						if (collided) {
 							//cout << "colliding";
 							objects[i].shape.color[0] = 0xFF;
@@ -105,6 +101,12 @@ class Arcade::Scene {
 				}
 			}
 
+			// updates all the objects in the scene
+			// with respect to the time passed since last update
+			for (int i = 0; i < objectCount; i++) {
+				objects[i].onUpdate(timeInterval);
+			}
+
 			// clears the frame
 			SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xFF);
 			SDL_RenderClear(renderer);
@@ -112,9 +114,11 @@ class Arcade::Scene {
 			// add each object to the frame
 			for (int i = 0; i < objectCount; i++) {
 				renderPolygon(objects[i]);
-				renderNormals(objects[i]);
+				//renderNormals(objects[i]);
 				renderMotion(objects[i]);
 			}
+
+			// cout << objects[0].motion.forces[0].toString() << "\t" << objects[1].motion.forces[0].toString() << "\n";
 
 			// renders the frame
 			SDL_RenderPresent(renderer);
@@ -185,7 +189,11 @@ class Arcade::Scene {
 			return;
 		}
 
-		Object createSquareObject(float length = 10, float mass = 1, float bounciness = 0, Vector2 position = Vector2{}, Vector2 velocity = Vector2{}, bool isDynamic = true) {
+		Object createSquareObject(
+			float length = 10, 
+			float mass = 1, float bounciness = 0, 
+			Vector2 position = Vector2{}, Vector2 velocity = Vector2{}, 
+			bool isDynamic = true, bool isSolid = true) {
 			// creates an object with the given shape and motion
 			// don't know why I can't pass the polygon through here
 			Object object;
@@ -210,7 +218,11 @@ class Arcade::Scene {
 			return object;
 		}
 
-		Object createCircleObject(float length = 10, float mass = 1, float bounciness = 0, Vector2 position = Vector2{}, Vector2 velocity = Vector2{}, bool isDynamic = true) {
+		Object createCircleObject(
+			float length = 10, 
+			float mass = 1, float bounciness = 0, 
+			Vector2 position = Vector2{}, Vector2 velocity = Vector2{}, 
+			bool isDynamic = true, bool isSolid = true) {
 			// creates an object with the given shape and motion
 			// don't know why I can't pass the polygon through here
 			Object object;
@@ -232,7 +244,10 @@ class Arcade::Scene {
 			return object;
 		}
 
-		Object createPolygonObject(int polyCount, float length = 10, float mass = 1, float bounciness = 0, Vector2 position = Vector2{}, Vector2 velocity = Vector2{}, bool isDynamic = true) {
+		Object createPolygonObject(int polyCount, float length = 10, 
+			float mass = 1, float bounciness = 0, 
+			Vector2 position = Vector2{}, Vector2 velocity = Vector2{}, 
+			bool isDynamic = true, bool isSolid = true) {
 			// creates an object with the given shape and motion
 			// don't know why I can't pass the polygon through here
 			Object object;
@@ -254,7 +269,12 @@ class Arcade::Scene {
 			return object;
 		}
 
-		Object createRectangleObject(float length = 20, float breadth = 10, float mass = 1, float bounciness = 0, Vector2 position = Vector2{}, Vector2 velocity = Vector2{}, bool isDynamic = true) {
+		Object createRectangleObject(
+			float length = 20, float breadth = 10,
+			float mass = 1, float bounciness = 0,
+			Vector2 position = Vector2{}, Vector2 velocity = Vector2{},
+			bool isDynamic = true, bool isSolid = true) {
+
 			// creates an object with the given shape and motion
 			// don't know why I can't pass the polygon through here
 			Object object;
@@ -280,13 +300,13 @@ class Arcade::Scene {
 int main() {
 
 	Scene scene;
-	/*scene.createSquareObject(50, 1, 0, Vector2{ float(ScreenWidth)/2 + 10, 180 }, Vector2{}, true);
+	scene.createCircleObject(50, 1, 0, Vector2{ float(ScreenWidth)/2 + 10, 180 }, Vector2{0, 50}, true, true);
 	scene.objects[0].shape.rotateShape(30);
-	scene.createSquareObject(50, 1, 0, Vector2{ float(ScreenWidth) / 2 - 30, 230 }, Vector2{}, true);
-	scene.objects[1].shape.rotateShape(-30);*/
+	scene.createSquareObject(50, 1, 0, Vector2{ float(ScreenWidth) / 2 - 30, 230 }, Vector2{0, -50}, true, true);
+	scene.objects[1].shape.rotateShape(50);
 
-	scene.createSquareObject(50, 1, 0, Vector2{ float(ScreenWidth) / 2, 180 }, Vector2{}, true);
-	scene.createSquareObject(50, 1, 0, Vector2{ float(ScreenWidth) / 2, 230 }, Vector2{}, true);
+	scene.createCircleObject(50, 1, 0, Vector2{ float(ScreenWidth) / 2, 100 }, Vector2{0, 50}, true, true);
+	scene.createCircleObject(50, 1, 0, Vector2{ float(ScreenWidth) / 2, 300 }, Vector2{0, -50}, true, true);
 
 	// scene.createSquareObject(100, 1, 0, Vector2{ float(ScreenWidth) / 2, 400 }, Vector2{}, false);
 
