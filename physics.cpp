@@ -77,6 +77,7 @@ class Physics::Shape {
 	public:
 		float length;
 		float breadth;
+		bool isSolid;
 		Vector2 polygon[50];
 		Vector2 normals[50];
 		SDL_Point points[50];
@@ -192,10 +193,12 @@ class Physics::Motion {
 		Vector2 acceleration;
 		bool isDynamic = true;
 	// protected:
-		Vector2 forces[50];
-		int forceCount;
+		Vector2 forces[3]{ Vector2{},Vector2{}, Vector2{} };
+		int forceCount = 3;
 		int gravityIndex = 0;
 		int collisionIndex = 1;
+		int processIndex = 2;
+		Vector2 deltaPosition = Vector2{};
 
 		Vector2 setPosition(Vector2 newPosition) {
 			// sets the position of this motion
@@ -265,8 +268,9 @@ class Physics::Motion {
 		Vector2 updatePosition(float timeInterval) {
 			// updates the position of this motion
 			// with respect to the time passed since last update
-			position.x = position.x + timeInterval * velocity.x;
-			position.y = position.y + timeInterval * velocity.y;
+			position.x = position.x + timeInterval * velocity.x + deltaPosition.x;
+			position.y = position.y + timeInterval * velocity.y + deltaPosition.y;
+			deltaPosition = Vector2{0, 0};
 			return position;
 		}
 

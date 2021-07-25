@@ -6,6 +6,7 @@
 #include <SDL.h>
 #include <C:\Users\git6f\arcadeEngine\arcade.cpp>
 #include <C:\Users\git6f\arcadeEngine\physics.cpp>
+#include <C:\Users\git6f\arcadeEngine\control.cpp>
 #include <C:\Users\git6f\arcadeEngine\object.cpp>
 
 using namespace std;
@@ -25,6 +26,7 @@ class Arcade::Scene {
 		int gravityEnum = 0;
 		bool _renderNormals = false;
 		bool _renderMotion = false;
+		Process processor = Process{};
 
 		void run() {
 
@@ -45,6 +47,9 @@ class Arcade::Scene {
 
 			// tracks the events
 			SDL_Event event;
+			// pass the address of the first object
+			processor.add(&objects[0]);
+			processor.isProcessing = true;
 
 			if (gravityEnum == 0) {
 				setGravity();
@@ -53,26 +58,28 @@ class Arcade::Scene {
 				setAltGravity();
 			}
 
-			while (isRunning)
-			{
+			while (isRunning) {
 				// updates the times
 				previousTime = currentTime;
 				currentTime = SDL_GetTicks();
 				timeInterval = (currentTime - previousTime) / 1000.0;
 				totalTime = totalTime + timeInterval;
 
-				while (SDL_PollEvent(&event))
-				{
-					if (event.type == SDL_QUIT)
+				while (SDL_PollEvent(&event)) {
+					if (event.type == SDL_QUIT) {
 						isRunning = false;
+						processor.isProcessing = false;
+					}
 				}
 
+				const Uint8* keystate = SDL_GetKeyboardState(NULL);
 
 				// do we need to update if timeInterval == 0?
 				if (timeInterval != 0) {
 					if (gravityEnum == 2) {
 						setCentralGravity();
 					}
+					processor.processContInput(keystate, timeInterval);
 					onUpdate(timeInterval);
 					checkCollisions(timeInterval);
 				}
@@ -234,7 +241,7 @@ class Arcade::Scene {
 			Object object;
 
 			// create the shape
-			Shape shape { length };
+			Shape shape { length, 0, isSolid };
 			object.shape = shape;
 			object.shape.createSquare();
 			object.shape.calculateAllNormals();
@@ -263,7 +270,7 @@ class Arcade::Scene {
 			Object object;
 
 			// create the shape
-			Shape shape{ length };
+			Shape shape{ length, 0, isSolid };
 			object.shape = shape;
 			object.shape.createCircle();
 			object.shape.calculateAllNormals();
@@ -288,7 +295,7 @@ class Arcade::Scene {
 			Object object;
 
 			// create the shape
-			Shape shape{ length };
+			Shape shape{ length, 0, isSolid };
 			object.shape = shape;
 			object.shape.createRegularPolygon(polyCount);
 			object.shape.calculateAllNormals();
@@ -315,7 +322,7 @@ class Arcade::Scene {
 			Object object;
 
 			// create the shape
-			Shape shape{ length, breadth };
+			Shape shape{ length, breadth, isSolid };
 			object.shape = shape;
 			object.shape.createRectangle();
 			object.shape.calculateAllNormals();
@@ -334,10 +341,10 @@ class Arcade::Scene {
 
 Scene twoBalls(Scene scene, int gravityEnum, float gravityMagnitude, bool _renderNormals, bool _renderMotion) {
 	float size = 50;
-	scene.createCircleObject(size, 1, 0.9,
+	scene.createCircleObject(size, 5, 1.0,
 		Vector2{ float(ScreenWidth / 2) , float(ScreenHeight / 2) - 150 },
 		Vector2{ 0, 50 }, true, true);
-	scene.createCircleObject(size, 1, 0.9,
+	scene.createCircleObject(size, 1, 1.0,
 		Vector2{ float(ScreenWidth / 2) , float(ScreenHeight / 2) + 150 },
 		Vector2{ 0, -50 }, true, true);
 	scene._renderNormals = _renderNormals;
@@ -347,23 +354,57 @@ Scene twoBalls(Scene scene, int gravityEnum, float gravityMagnitude, bool _rende
 	return scene;
 };
 
-Scene fivePolyons(Scene scene, int gravityEnum, float gravityMagnitude, bool _renderNormals, bool _renderMotion) {
+Scene twoShapes(Scene scene, int gravityEnum, float gravityMagnitude, bool _renderNormals, bool _renderMotion) {
 	float size = 50;
-	scene.createPolygonObject(6, size, 1, 0.5,
+	scene.createCircleObject(size, 1, 1.0,
+		Vector2{ float(ScreenWidth / 2) , float(ScreenHeight / 2) - 150 },
+		Vector2{ 0, 50 }, true, true);
+	scene.createPolygonObject(6, size, 1, 1.0,
 		Vector2{ float(ScreenWidth / 2) - 70, float(ScreenHeight / 2) - 150 },
 		Vector2{ 0, 50 }, true, true);
-	scene.createPolygonObject(6, size, 1, 0.5,
+	scene._renderNormals = _renderNormals;
+	scene._renderMotion = _renderMotion;
+	scene.gravity = scene.gravity.normalize().scalarTransform(gravityMagnitude);
+	scene.gravityEnum = gravityEnum;
+	return scene;
+};
+
+Scene fivePolyons(Scene scene, int gravityEnum, float gravityMagnitude, bool _renderNormals, bool _renderMotion) {
+	float size = 50;
+	scene.createPolygonObject(6, size, 1, 1.0,
+		Vector2{ float(ScreenWidth / 2) - 70, float(ScreenHeight / 2) - 150 },
+		Vector2{ 0, 50 }, true, true);
+	scene.createPolygonObject(6, size, 1, 1.0,
 		Vector2{ float(ScreenWidth / 2) + 20, float(ScreenHeight / 2) + 150 },
 		Vector2{ 0, 50 }, true, true);
-	scene.createPolygonObject(6, size, 1, 0.5,
+	scene.createPolygonObject(6, size, 1, 1.0,
 		Vector2{ float(ScreenWidth / 2) + 30, float(ScreenHeight / 2) - 150 },
 		Vector2{ 0, 50 }, true, true);
-	scene.createPolygonObject(6, size, 1, 0.5,
+	scene.createPolygonObject(6, size, 1, 1.0,
 		Vector2{ float(ScreenWidth / 2) + 100, float(ScreenHeight / 2) + 150 },
 		Vector2{ 0, 50 }, true, true);
-	scene.createPolygonObject(6, size, 1, 0.5,
+	scene.createPolygonObject(6, size, 1, 1.0,
 		Vector2{ float(ScreenWidth / 2) + 200, float(ScreenHeight / 2) - 150 },
 		Vector2{ 0, 50 }, true, true);
+	scene._renderNormals = _renderNormals;
+	scene._renderMotion = _renderMotion;
+	scene.gravity = scene.gravity.normalize().scalarTransform(gravityMagnitude);
+	scene.gravityEnum = gravityEnum;
+	return scene;
+};
+
+Scene empty(Scene scene, int gravityEnum, float gravityMagnitude, bool _renderNormals, bool _renderMotion) {
+	scene._renderNormals = _renderNormals;
+	scene._renderMotion = _renderMotion;
+	scene.gravity = scene.gravity.normalize().scalarTransform(gravityMagnitude);
+	scene.gravityEnum = gravityEnum;
+	return scene;
+};
+
+Scene basic(Scene scene, int gravityEnum, float gravityMagnitude, bool _renderNormals, bool _renderMotion) {
+	scene.createCircleObject(50, 1, 0.5,
+		Vector2{ float(ScreenWidth / 2), float(ScreenHeight / 2) },
+		Vector2{ 0, 0 }, true, true);
 	scene._renderNormals = _renderNormals;
 	scene._renderMotion = _renderMotion;
 	scene.gravity = scene.gravity.normalize().scalarTransform(gravityMagnitude);
@@ -387,7 +428,7 @@ Scene fiftyBalls(Scene scene, int gravityEnum, float gravityMagnitude, bool _ren
 
 Scene fiftyPolyons(Scene scene, int gravityEnum, float gravityMagnitude, bool _renderNormals, bool _renderMotion) {
 	float size = 50;
-	for (int i = 0; i < 50; i++) {
+	for (int i = 0; i < 20; i++) {
 		scene.createPolygonObject(6, size, 1, 0.5,
 			Vector2{ float(rand() % ScreenWidth), float(ScreenHeight / 2) - 75 + float(rand() % 150) },
 			Vector2{ 0, 50 }, true, true);
@@ -402,7 +443,7 @@ Scene fiftyPolyons(Scene scene, int gravityEnum, float gravityMagnitude, bool _r
 Scene polygonScene(Scene scene, int gravityEnum, float gravityMagnitude, bool _renderNormals, bool _renderMotion) {
 	for (int i = 0; i < 99; i++) {
 		float size = 5 + float(rand() % 15);
-		scene.createPolygonObject(3 + rand() % 45, size, size / 10, 0.9,
+		scene.createPolygonObject(3 + rand() % 45, size, size / 10, 0.3,
 			Vector2{ float(rand() % ScreenWidth) , float(rand() % ScreenHeight) },
 			Vector2{ float(rand() % 200), float(rand() % 200) }, true, true);
 	}
@@ -416,7 +457,7 @@ Scene polygonScene(Scene scene, int gravityEnum, float gravityMagnitude, bool _r
 Scene circularScene(Scene scene, int gravityEnum, float gravityMagnitude, bool _renderNormals, bool _renderMotion) {
 	for (int i = 0; i < 75; i++) {
 		float size = 5 + float(rand() % 15);
-		scene.createCircleObject(size, size / 10, 0.9,
+		scene.createCircleObject(size, size / 10, 0.1,
 			Vector2{ float(rand() % ScreenWidth) , float(rand() % ScreenHeight) },
 			Vector2{ float(rand() % 200), float(rand() % 200) }, true, true);
 	}
@@ -431,29 +472,17 @@ Scene circularScene(Scene scene, int gravityEnum, float gravityMagnitude, bool _
 int main(int argc, char** argv) {
 
 	Scene scene;
-	const char* sceneArg = argv[1];
 
-	if (sceneArg == "twoBall") {
-		cout << "hello";
-		scene = twoBalls(scene, 1, 100, false, true);
-	}
-	else if (sceneArg == "fivePoly") {
-		scene = fivePolyons(scene, 0, 100, false, false);
-	}
-	else if (sceneArg == "fiftyBall") {
-		scene = fiftyBalls(scene, 1, 100, false, false);
-	}
-	else if (sceneArg == "fiftyPoly") {
-		scene = fiftyPolyons(scene, 0, 100, false, false);
-	}
-	else if (sceneArg == "manyPoly") {
-		scene = polygonScene(scene, 2, 100, false, false);
-	}
-	else if (sceneArg == "manyBall") {
-		scene = circularScene(scene, 2, 100, false, false);
-	}
+	// scene = basic(scene, 1, 0, false, false);
+	// scene = twoBalls(scene, 0, 100, false, true);
+	// scene = twoShapes(scene, 0, 100, false, true);
+
+	// scene = fivePolyons(scene, 0, 1000, false, false);
+	// scene = fiftyBalls(scene, 1, 100, false, false);
+	// scene = fiftyPolyons(scene, 0, 100, false, false);
+	// scene = polygonScene(scene, 2, 100, false, false);
+	scene = circularScene(scene, 2, 5, false, false); // the singularity boss
 	
-	cout << sceneArg << "\n";
 	cout << scene.objectCount << "\n";
 
 	scene.run();

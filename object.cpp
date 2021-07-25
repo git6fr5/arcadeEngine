@@ -1,6 +1,7 @@
 #pragma once
 #include <limits>
 #include <iostream>
+#include <SDL.h>
 
 #include <C:\Users\git6f\arcadeEngine\arcade.cpp>
 #include <C:\Users\git6f\arcadeEngine\physics.cpp>
@@ -13,7 +14,6 @@ class Arcade::Object {
 	public:
 		Shape shape;
 		Motion motion;
-		bool isStatic = false;
 
 		void onUpdate(float timeInterval) {
 			// updates the motion of the object
@@ -22,6 +22,10 @@ class Arcade::Object {
 
 			// reset collision force
 			motion.removeForce(motion.collisionIndex);
+
+			// damp the input force
+			// motion.forces[motion.processIndex] = motion.forces[motion.processIndex].scalarTransform(0.975);
+			motion.removeForce(motion.processIndex);
 		}
 
 		void onCollision(Object objectB, float timeInterval, bool isFirst = true) {
@@ -34,13 +38,13 @@ class Arcade::Object {
 			// check that the boundaries are set properly
 			if (objectBCenter.magnitude() <= (shape.length + objectB.shape.length)/2) {
 				float diff = ((shape.length + objectB.shape.length)/2 - objectBCenter.magnitude()) / 2;
-				motion.position = motion.position.translate(forceDirection.normalize().scalarTransform(diff));
-				cout << "Adjusting boundary" << "\n";
+				motion.deltaPosition = forceDirection.normalize().scalarTransform(diff);
+				// cout << "Adjusting boundary" << "\n";
 			}
 
 			// get the relative velocities
 			Vector2 negativeVelocity = motion.velocity.scalarTransform(-1);
-			Vector2 objectBRelativeVelocity = negativeVelocity.translate(negativeVelocity);
+			Vector2 objectBRelativeVelocity = objectB.motion.velocity.translate(negativeVelocity);
 			
 			// get the velocity in the direction of the force
 			Vector2 velocityProjection = objectBRelativeVelocity.project(forceDirection);
@@ -50,6 +54,8 @@ class Arcade::Object {
 			collisionForce = collisionForce.scalarTransform(motion.elasticity);
 
 			// add the collision force
+			// cout << "collision \n"; // this seems to affect the actual gameplay?
+
 			motion.setForce(motion.collisionIndex, collisionForce);
 
 		}
@@ -58,6 +64,9 @@ class Arcade::Object {
 		bool checkCollision(Object objectB, float timeInterval) {
 
 			bool isColliding = false;
+			if (shape.isSolid == false || objectB.shape.isSolid == false) {
+				return isColliding;
+			}
 			if (shape.isCircle && objectB.shape.isCircle) {
 				isColliding = circularCollision(objectB);
 			}
@@ -163,24 +172,29 @@ class Arcade::Object {
 			float boundaryHit = false;
 			if (motion.position.x > horizontalBound - shape.length / 2) {
 				motion.position.x = horizontalBound - shape.length / 2;
+				motion.velocity.x = -motion.velocity.x;
 				boundaryHit = true;
 			}
 			else if (motion.position.x < shape.length / 2) {
 				motion.position.x = shape.length / 2;
+				motion.velocity.x = -motion.velocity.x;
 				boundaryHit = true;
 			}
 			if (motion.position.y > verticalBound - shape.length / 2) {
 				motion.position.y = verticalBound - shape.length / 2;
+				motion.velocity.y = -motion.velocity.y;
 				boundaryHit = true;
 			}
 			else if (motion.position.y < shape.length / 2) {
 				motion.position.y = shape.length / 2;
+				motion.velocity.y = -motion.velocity.y;
 				boundaryHit = true;
 			}
 			if (boundaryHit) {
-				motion.velocity = motion.velocity.scalarTransform(-motion.elasticity);
+				// how does this work
+				motion.velocity = motion.velocity.scalarTransform(motion.elasticity);
 			}
-			if (motion.velocity.magnitude() > 300) {
+			if (motion.velocity.magnitude() > 500) {
 				motion.velocity = motion.velocity.normalize().scalarTransform(500);
 			}
 			return boundaryHit;
