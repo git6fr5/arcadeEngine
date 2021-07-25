@@ -10,7 +10,7 @@
 using namespace std;
 using namespace Arcade;
 
-typedef Control::Process Process;
+typedef Control::Processor Processor;
 typedef Control::Output Output;
 
 class Control::Output {
@@ -56,7 +56,7 @@ class Control::Output {
 
 };
 
-class Control::Process {
+class Control::Processor {
 
 	public:
 		bool isProcessing = false;
@@ -72,9 +72,18 @@ class Control::Process {
 			return objectCount;
 		}
 
-		// note : always process with respect to time interval in order to
-		// keep game play consistent
-		void processContInput(const Uint8* keystate, float timeInterval) {
+		virtual void runProcesses(const Uint8* keystate, float timeInterval) {
+			//
+			cout << "hello" << "\n";
+		}
+};
+
+class Player : public Processor {
+
+	// note : always process with respect to time interval in order to
+	// keep game play consistent
+	public:
+		virtual void runProcesses(const Uint8* keystate, float timeInterval) override {
 
 			//continuous-response keys
 			float intensity = 750 * timeInterval;
@@ -93,5 +102,137 @@ class Control::Process {
 
 			};
 		}
+
+};
+
+class Attractor : public Processor {
+
+	public:
+		// note : always process with respect to time interval in order to
+		// keep game play consistent
+
+		void runProcesses(const Uint8* keystate, float timeInterval) override {
+
+			float attraction = 0.3;
+			float totalMass = 0;
+			for (int i = 0; i < objectCount; i++) {
+				totalMass = totalMass + (*objectPointers[i]).motion.mass;
+			}
+			if (totalMass > 0) {
+				attraction = attraction / totalMass;
+			}
+
+			for (int i = 0; i < objectCount; i++) {
+
+				Object* attractorPointer = objectPointers[i];
+				for (int j = 0; j < objectCount; j++) {
+
+					if (i != j) {
+						Object* attracteePointer = objectPointers[j];
+
+						// get the direction of the force
+						Vector2 negativePosition = (*attracteePointer).motion.position.scalarTransform(-1);
+						Vector2 attractorCenter = (*attractorPointer).motion.position.translate(negativePosition);
+						Vector2 forceDirection = attractorCenter.normalize();
+						float mass = (*objectPointers[i]).motion.mass;
+
+						if (attractorCenter.magnitude() < attraction) {
+							// forceDirection.scalarTransform(-1);
+							attractorCenter.scalarTransform(0);
+						}
+
+
+						int processIndex = (*attracteePointer).motion.processIndex;
+						Vector2 processedForce = (*attracteePointer).motion.forces[processIndex];
+						float factor = pow((attractorCenter.magnitude() / 100) ,2);
+						Vector2 newForce = processedForce.translate(forceDirection.normalize().scalarTransform(factor * mass * attraction / timeInterval));
+
+						(*attracteePointer).motion.setForce(processIndex, newForce);
+					}
+					
+
+				}
+			}
+
+		} 
+
+};
+
+class Orbiter : public Processor {
+
+	public:
+		// note : always process with respect to time interval in order to
+		// keep game play consistent
+
+		void runProcesses(const Uint8* keystate, float timeInterval) override {
+
+
+			Object* attractorPointer = objectPointers[0];
+			float mass = (*attractorPointer).motion.mass;
+
+			for (int j = 1; j < objectCount; j++) {
+
+				Object* attracteePointer = objectPointers[j];
+
+				// get the direction of the force
+				Vector2 negativePosition = (*attracteePointer).motion.position.scalarTransform(-1);
+				Vector2 attractorCenter = (*attractorPointer).motion.position.translate(negativePosition);
+				Vector2 forceDirection = attractorCenter.normalize();
+
+				if (attractorCenter.magnitude() < (*attractorPointer).shape.length) {
+					// forceDirection.scalarTransform(-1);
+					attractorCenter.scalarTransform(-1);
+				}
+
+
+				int processIndex = (*attracteePointer).motion.processIndex;
+				Vector2 processedForce = (*attracteePointer).motion.forces[processIndex];
+				float factor = pow((attractorCenter.magnitude() / 100) ,2);
+				Vector2 newForce = processedForce.translate(forceDirection.normalize().scalarTransform(factor * mass / timeInterval));
+
+				(*attracteePointer).motion.setForce(processIndex, newForce);
+					
+			}
+
+		} 
+
+};
+
+class Trailer : public Processor {
+
+	public:
+		// note : always process with respect to time interval in order to
+		// keep game play consistent
+
+		void runProcesses(const Uint8* keystate, float timeInterval) override {
+
+			for (int j = 1; j < objectCount; j++) {
+
+				Object* attractorPointer = objectPointers[j-1];
+				float mass = (*attractorPointer).motion.mass;
+
+				Object* attracteePointer = objectPointers[j];
+
+				// get the direction of the force
+				Vector2 negativePosition = (*attracteePointer).motion.position.scalarTransform(-1);
+				Vector2 attractorCenter = (*attractorPointer).motion.position.translate(negativePosition);
+				Vector2 forceDirection = attractorCenter.normalize();
+
+				if (attractorCenter.magnitude() < (*attractorPointer).shape.length) {
+					// forceDirection.scalarTransform(-1);
+					attractorCenter.scalarTransform(-1);
+				}
+
+
+				int processIndex = (*attracteePointer).motion.processIndex;
+				Vector2 processedForce = (*attracteePointer).motion.forces[processIndex];
+				float factor = attractorCenter.magnitude();
+				Vector2 newForce = processedForce.translate(forceDirection.normalize().scalarTransform(factor / timeInterval));
+
+				(*attracteePointer).motion.setForce(processIndex, newForce);
+					
+			}
+
+		} 
 
 };

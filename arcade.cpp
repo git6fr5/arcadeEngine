@@ -12,7 +12,7 @@ namespace Arcade {
 
 namespace Arcade::Control {
 
-	class Process;
+	class Processor;
 	class Output;
 
 }

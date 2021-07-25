@@ -18,15 +18,15 @@ int ScreenHeight = int(920 / 2);
 class Arcade::Scene {
 
 	public:
-		bool isRunning;
-		Object objects[100];
-		int objectCount = 0;
-		Vector2 gravity{ 0, 100 };
-		SDL_Renderer* renderer;
-		int gravityEnum = 0;
 		bool _renderNormals = false;
 		bool _renderMotion = false;
-		Process processor = Process{};
+		Vector2 gravity = Vector2{ 0, 0 };
+		bool isRunning;
+		Object objects[500];
+		int objectCount = 0;
+		SDL_Renderer* renderer;
+		Processor* processors[50];
+		int processorCount = 0;
 
 		void run() {
 
@@ -47,16 +47,8 @@ class Arcade::Scene {
 
 			// tracks the events
 			SDL_Event event;
-			// pass the address of the first object
-			processor.add(&objects[0]);
-			processor.isProcessing = true;
 
-			if (gravityEnum == 0) {
-				setGravity();
-			}
-			else if (gravityEnum == 1) {
-				setAltGravity();
-			}
+			cout << processorCount;
 
 			while (isRunning) {
 				// updates the times
@@ -68,7 +60,6 @@ class Arcade::Scene {
 				while (SDL_PollEvent(&event)) {
 					if (event.type == SDL_QUIT) {
 						isRunning = false;
-						processor.isProcessing = false;
 					}
 				}
 
@@ -76,16 +67,21 @@ class Arcade::Scene {
 
 				// do we need to update if timeInterval == 0?
 				if (timeInterval != 0) {
-					if (gravityEnum == 2) {
-						setCentralGravity();
-					}
-					processor.processContInput(keystate, timeInterval);
+					processObjects(keystate, timeInterval);
 					onUpdate(timeInterval);
 					checkCollisions(timeInterval);
 				}
 
 				renderFrame();
 
+			}
+		}
+
+		void processObjects(const Uint8* keystate, float timeInterval) {
+			for (int i = 0; i < processorCount; i++) {
+				// cout << "processing";
+				(*(processors[i])).runProcesses(keystate, timeInterval); // runProcesses(keystate, timeInterval);
+				// cout << "processing2";
 			}
 		}
 
@@ -205,30 +201,9 @@ class Arcade::Scene {
 			return;
 		}
 
-		void setGravity() {
-			// add gravity to all the initialized objects
-			for (int i = 0; i < objectCount; i++) {
-				objects[i].motion.setForce(objects[i].motion.gravityIndex, gravity.scalarTransform(objects[i].motion.mass));
-			}
-		}
-
-		void setAltGravity() {
-			// add alternating gravity to all the initialized objects
-			for (int i = 0; i < objectCount; i++) {
-				if (i % 2 == 0) {
-					objects[i].motion.setForce(objects[i].motion.gravityIndex, gravity.scalarTransform(objects[i].motion.mass * 1)); // sin(M_PI / 2 + totalTime)
-				}
-				else {
-					objects[i].motion.setForce(objects[i].motion.gravityIndex, gravity.scalarTransform(objects[i].motion.mass * -1)); // sin(M_PI / 2 + totalTime)
-				}
-			}
-		}
-
-		void setCentralGravity() {
-			for (int i = 0; i < objectCount; i++) {
-				Vector2 centralForce = objects[i].motion.position.scalarTransform(-1).translate(Vector2{ float(ScreenWidth / 2), float(ScreenHeight / 2) }).scalarTransform(gravity.magnitude());
-				objects[i].motion.setForce(objects[i].motion.gravityIndex, centralForce);
-			}
+		int addProcess(Processor* processor) {
+			
+			return processorCount;
 		}
 
 		Object createSquareObject(
@@ -337,24 +312,52 @@ class Arcade::Scene {
 
 			return object;
 		}
+
+		int createEmptyProcessor() {
+			Processor processor = Processor{};
+			processors[processorCount] = &processor;
+			processorCount++;
+			return processorCount - 1;
+		}
 };
 
-Scene twoBalls(Scene scene, int gravityEnum, float gravityMagnitude, bool _renderNormals, bool _renderMotion) {
-	float size = 50;
-	scene.createCircleObject(size, 5, 1.0,
+Player playerSpawner(Scene* scenePointer) {
+
+	Player processor = Player{};
+
+	float size = 25;
+	Object objectA = (*scenePointer).createCircleObject(size, 1, 1.0,
 		Vector2{ float(ScreenWidth / 2) , float(ScreenHeight / 2) - 150 },
-		Vector2{ 0, 50 }, true, true);
-	scene.createCircleObject(size, 1, 1.0,
-		Vector2{ float(ScreenWidth / 2) , float(ScreenHeight / 2) + 150 },
-		Vector2{ 0, -50 }, true, true);
-	scene._renderNormals = _renderNormals;
-	scene._renderMotion = _renderMotion;
-	scene.gravity = scene.gravity.normalize().scalarTransform(gravityMagnitude);
-	scene.gravityEnum = gravityEnum;
-	return scene;
+		Vector2{ 0, 0 }, true, true);
+	processor.add(&(*scenePointer).objects[(*scenePointer).objectCount - 1]);
+
+	processor.isProcessing = true;
+
+	return processor;
 };
 
-Scene twoShapes(Scene scene, int gravityEnum, float gravityMagnitude, bool _renderNormals, bool _renderMotion) {
+Attractor attractorSpawner(Scene* scenePointer) {
+
+	Attractor processor = Attractor{};
+
+	// create the objects
+	float size = 50;
+	Object objectA = (*scenePointer).createCircleObject(size, 1, 1.0,
+		Vector2{ float(ScreenWidth / 2) , float(ScreenHeight / 2) - 150 },
+		Vector2{ 0, 0 }, true, true);
+	processor.add(&(*scenePointer).objects[(*scenePointer).objectCount-1]);
+
+	Object objectB = (*scenePointer).createCircleObject(size, 1, 1.0,
+		Vector2{ float(ScreenWidth / 2) , float(ScreenHeight / 2) + 150 },
+		Vector2{ 0, 0 }, true, true);
+	processor.add(&(*scenePointer).objects[(*scenePointer).objectCount - 1]);
+
+	processor.isProcessing = true;
+
+	return processor;
+};
+
+Scene twoShapes(Scene scene) {
 	float size = 50;
 	scene.createCircleObject(size, 1, 1.0,
 		Vector2{ float(ScreenWidth / 2) , float(ScreenHeight / 2) - 150 },
@@ -362,14 +365,10 @@ Scene twoShapes(Scene scene, int gravityEnum, float gravityMagnitude, bool _rend
 	scene.createPolygonObject(6, size, 1, 1.0,
 		Vector2{ float(ScreenWidth / 2) - 70, float(ScreenHeight / 2) - 150 },
 		Vector2{ 0, 50 }, true, true);
-	scene._renderNormals = _renderNormals;
-	scene._renderMotion = _renderMotion;
-	scene.gravity = scene.gravity.normalize().scalarTransform(gravityMagnitude);
-	scene.gravityEnum = gravityEnum;
 	return scene;
 };
 
-Scene fivePolyons(Scene scene, int gravityEnum, float gravityMagnitude, bool _renderNormals, bool _renderMotion) {
+Scene fivePolyons(Scene scene) {
 	float size = 50;
 	scene.createPolygonObject(6, size, 1, 1.0,
 		Vector2{ float(ScreenWidth / 2) - 70, float(ScreenHeight / 2) - 150 },
@@ -386,102 +385,190 @@ Scene fivePolyons(Scene scene, int gravityEnum, float gravityMagnitude, bool _re
 	scene.createPolygonObject(6, size, 1, 1.0,
 		Vector2{ float(ScreenWidth / 2) + 200, float(ScreenHeight / 2) - 150 },
 		Vector2{ 0, 50 }, true, true);
-	scene._renderNormals = _renderNormals;
-	scene._renderMotion = _renderMotion;
-	scene.gravity = scene.gravity.normalize().scalarTransform(gravityMagnitude);
-	scene.gravityEnum = gravityEnum;
 	return scene;
 };
 
-Scene empty(Scene scene, int gravityEnum, float gravityMagnitude, bool _renderNormals, bool _renderMotion) {
-	scene._renderNormals = _renderNormals;
-	scene._renderMotion = _renderMotion;
-	scene.gravity = scene.gravity.normalize().scalarTransform(gravityMagnitude);
-	scene.gravityEnum = gravityEnum;
+Scene empty(Scene scene) {
 	return scene;
 };
 
-Scene basic(Scene scene, int gravityEnum, float gravityMagnitude, bool _renderNormals, bool _renderMotion) {
-	scene.createCircleObject(50, 1, 0.5,
+Scene basic(Scene scene) {
+	Object object = scene.createCircleObject(50, 1, 0.5,
 		Vector2{ float(ScreenWidth / 2), float(ScreenHeight / 2) },
 		Vector2{ 0, 0 }, true, true);
-	scene._renderNormals = _renderNormals;
-	scene._renderMotion = _renderMotion;
-	scene.gravity = scene.gravity.normalize().scalarTransform(gravityMagnitude);
-	scene.gravityEnum = gravityEnum;
 	return scene;
 };
 
-Scene fiftyBalls(Scene scene, int gravityEnum, float gravityMagnitude, bool _renderNormals, bool _renderMotion) {
+Scene fiftyBalls(Scene scene) {
 	float size = 50;
 	for (int i = 0; i < 50; i++) {
 		scene.createCircleObject(size, 1, 0.5,
 			Vector2{ float(rand() % ScreenWidth), float(ScreenHeight / 2) - 75 + float(rand() % 150) },
 			Vector2{ 0, 50 }, true, true);
 	}
-	scene._renderNormals = _renderNormals;
-	scene._renderMotion = _renderMotion;
-	scene.gravity = scene.gravity.normalize().scalarTransform(gravityMagnitude);
-	scene.gravityEnum = gravityEnum;
 	return scene;
 };
 
-Scene fiftyPolyons(Scene scene, int gravityEnum, float gravityMagnitude, bool _renderNormals, bool _renderMotion) {
+Scene fiftyPolyons(Scene scene) {
 	float size = 50;
 	for (int i = 0; i < 20; i++) {
 		scene.createPolygonObject(6, size, 1, 0.5,
 			Vector2{ float(rand() % ScreenWidth), float(ScreenHeight / 2) - 75 + float(rand() % 150) },
 			Vector2{ 0, 50 }, true, true);
 	}
-	scene._renderNormals = _renderNormals;
-	scene._renderMotion = _renderMotion;
-	scene.gravity = scene.gravity.normalize().scalarTransform(gravityMagnitude);
-	scene.gravityEnum = gravityEnum;
 	return scene;
 };
 
-Scene polygonScene(Scene scene, int gravityEnum, float gravityMagnitude, bool _renderNormals, bool _renderMotion) {
+Scene polygonScene(Scene scene) {
 	for (int i = 0; i < 99; i++) {
 		float size = 5 + float(rand() % 15);
 		scene.createPolygonObject(3 + rand() % 45, size, size / 10, 0.3,
 			Vector2{ float(rand() % ScreenWidth) , float(rand() % ScreenHeight) },
 			Vector2{ float(rand() % 200), float(rand() % 200) }, true, true);
 	}
-	scene._renderNormals = _renderNormals;
-	scene._renderMotion = _renderMotion;
-	scene.gravity = scene.gravity.normalize().scalarTransform(gravityMagnitude);
-	scene.gravityEnum = gravityEnum;
 	return scene;
 };
 
-Scene circularScene(Scene scene, int gravityEnum, float gravityMagnitude, bool _renderNormals, bool _renderMotion) {
-	for (int i = 0; i < 75; i++) {
+Attractor singularitySpawner(Scene* scenePointer) {
+
+	Attractor processor = Attractor{};
+
+	for (int i = 0; i < 50; i++) {
 		float size = 5 + float(rand() % 15);
-		scene.createCircleObject(size, size / 10, 0.1,
+		(*scenePointer).createCircleObject(size, size / 10, 0.1,
 			Vector2{ float(rand() % ScreenWidth) , float(rand() % ScreenHeight) },
 			Vector2{ float(rand() % 200), float(rand() % 200) }, true, true);
+		processor.add(&(*scenePointer).objects[(*scenePointer).objectCount - 1]);
 	}
-	scene._renderNormals = _renderNormals;
-	scene._renderMotion = _renderMotion;
-	scene.gravity = scene.gravity.normalize().scalarTransform(gravityMagnitude);
-	scene.gravityEnum = gravityEnum;
-	return scene;
+
+	processor.isProcessing = true;
+
+	return processor;
+};
+
+Orbiter saturnSpawner(Scene* scenePointer) {
+
+	Orbiter processor = Orbiter{};
+
+	(*scenePointer).createCircleObject(30, 1, 0.9,
+		Vector2{ float(rand() % ScreenWidth) , float(rand() % ScreenHeight) },
+		Vector2{ float(rand() % 200), float(rand() % 200) }, true, true);
+	processor.add(&(*scenePointer).objects[(*scenePointer).objectCount - 1]);
+
+	for (int i = 0; i < 15; i++) {
+		float size = 5 + float(rand() % 15);
+		(*scenePointer).createCircleObject(size, size / 10, 0.1,
+			Vector2{ float(rand() % ScreenWidth) , float(rand() % ScreenHeight) },
+			Vector2{ float(rand() % 200), float(rand() % 200) }, true, true);
+		processor.add(&(*scenePointer).objects[(*scenePointer).objectCount - 1]);
+	}
+
+	processor.isProcessing = true;
+
+	return processor;
+};
+
+Orbiter ghostSaturnSpawner(Scene* scenePointer) {
+
+	Orbiter processor = Orbiter{};
+
+	(*scenePointer).createCircleObject(30, 1, 0.1,
+		Vector2{ float(rand() % ScreenWidth) , float(rand() % ScreenHeight) },
+		Vector2{ float(rand() % 200), float(rand() % 200) }, true, false);
+	processor.add(&(*scenePointer).objects[(*scenePointer).objectCount - 1]);
+
+	for (int i = 0; i < 15; i++) {
+		float size = 5 + float(rand() % 15);
+		(*scenePointer).createCircleObject(size, size / 10, 0.1,
+			Vector2{ float(rand() % ScreenWidth) , float(rand() % ScreenHeight) },
+			Vector2{ float(rand() % 200), float(rand() % 200) }, true, false);
+		processor.add(&(*scenePointer).objects[(*scenePointer).objectCount - 1]);
+	}
+
+	processor.isProcessing = true;
+
+	return processor;
+};
+
+Orbiter blobSaturnSpawner(Scene* scenePointer) {
+
+	Orbiter processor = Orbiter{};
+
+	(*scenePointer).createCircleObject(30, 1, 0.1,
+		Vector2{ float(rand() % ScreenWidth) , float(rand() % ScreenHeight) },
+		Vector2{ float(rand() % 200), float(rand() % 200) }, true, true);
+	processor.add(&(*scenePointer).objects[(*scenePointer).objectCount - 1]);
+
+	for (int i = 0; i < 15; i++) {
+		float size = 5 + float(rand() % 15);
+		(*scenePointer).createCircleObject(size, size / 10, 0.1,
+			Vector2{ float(rand() % ScreenWidth) , float(rand() % ScreenHeight) },
+			Vector2{ float(rand() % 200), float(rand() % 200) }, true, false);
+		processor.add(&(*scenePointer).objects[(*scenePointer).objectCount - 1]);
+	}
+
+	processor.isProcessing = true;
+
+	return processor;
+};
+
+Trailer snakeSpawner(Scene* scenePointer) {
+
+	Trailer processor = Trailer{};
+
+	(*scenePointer).createCircleObject(30, 1, 0.9,
+		Vector2{ float(rand() % ScreenWidth) , float(rand() % ScreenHeight) },
+		Vector2{ float(rand() % 200), float(rand() % 200) }, true, true);
+	processor.add(&(*scenePointer).objects[(*scenePointer).objectCount - 1]);
+
+	for (int i = 0; i < 15; i++) {
+		float size = 5 + float(rand() % 15);
+		(*scenePointer).createCircleObject(size, size / 10, 0.1,
+			Vector2{ float(rand() % ScreenWidth) , float(rand() % ScreenHeight) },
+			Vector2{ 0, 0 }, true, true);
+		processor.add(&(*scenePointer).objects[(*scenePointer).objectCount - 1]);
+	}
+
+	processor.isProcessing = true;
+
+	return processor;
 };
 
 
 int main(int argc, char** argv) {
 
-	Scene scene;
+	Scene scene{ false, false};
 
-	// scene = basic(scene, 1, 0, false, false);
-	// scene = twoBalls(scene, 0, 100, false, true);
-	// scene = twoShapes(scene, 0, 100, false, true);
+	Player player = playerSpawner(&scene);
+	scene.processors[scene.processorCount] = &player;
+	scene.processorCount++;
 
-	// scene = fivePolyons(scene, 0, 1000, false, false);
-	// scene = fiftyBalls(scene, 1, 100, false, false);
-	// scene = fiftyPolyons(scene, 0, 100, false, false);
-	// scene = polygonScene(scene, 2, 100, false, false);
-	scene = circularScene(scene, 2, 5, false, false); // the singularity boss
+	/*Attractor attractor = attractorSpawner(&scene);
+	scene.processors[scene.processorCount] = &attractor;
+	scene.processorCount++;*/
+
+	/*Attractor singularity = singularitySpawner(&scene);
+	scene.processors[scene.processorCount] = &singularity;
+	scene.processorCount++;
+
+	Orbiter saturn = saturnSpawner(&scene);
+	scene.processors[scene.processorCount] = &saturn;
+	scene.processorCount++;*/
+
+	/*Orbiter ghostSaturn = ghostSaturnSpawner(&scene);
+	scene.processors[scene.processorCount] = &ghostSaturn;
+	scene.processorCount++;
+
+	Orbiter blobSaturn = blobSaturnSpawner(&scene);
+	scene.processors[scene.processorCount] = &blobSaturn;
+	scene.processorCount++;*/
+
+	Trailer snake = snakeSpawner(&scene);
+	scene.processors[scene.processorCount] = &snake;
+	scene.processorCount++;
+
+	// have an enemy with a large central mass and little orbs orbiting him
+	
 	
 	cout << scene.objectCount << "\n";
 
