@@ -20,8 +20,11 @@ class Arcade::Scene {
 		bool isRunning;
 		Object objects[100];
 		int objectCount = 0;
-		Vector2 gravity{ 0, 1 };
+		Vector2 gravity{ 0, 100 };
 		SDL_Renderer* renderer;
+		int gravityEnum = 0;
+		bool _renderNormals = false;
+		bool _renderMotion = false;
 
 		void run() {
 
@@ -40,22 +43,14 @@ class Arcade::Scene {
 			float timeInterval = 0;
 			float totalTime = 0;
 
-			// add gravity to all the initialized objects
-			/*for (int i = 0; i < objectCount; i++) {
-				objects[i].motion.addForce(gravity.scalarTransform(objects[i].motion.mass));
-			}*/
-
 			// tracks the events
 			SDL_Event event;
 
-			// for fun
-			for (int i = 0; i < objectCount; i++) {
-				if (i % 2 == 0) {
-					objects[i].motion.setForce(0, gravity.scalarTransform(objects[i].motion.mass * 1)); // sin(M_PI / 2 + totalTime)
-				}
-				else {
-					objects[i].motion.setForce(0, gravity.scalarTransform(objects[i].motion.mass * -1)); // sin(M_PI / 2 + totalTime)
-				}
+			if (gravityEnum == 0) {
+				setGravity();
+			}
+			else if (gravityEnum == 1) {
+				setAltGravity();
 			}
 
 			while (isRunning)
@@ -63,7 +58,7 @@ class Arcade::Scene {
 				// updates the times
 				previousTime = currentTime;
 				currentTime = SDL_GetTicks();
-				timeInterval = (currentTime - previousTime) / 500.0;
+				timeInterval = (currentTime - previousTime) / 1000.0;
 				totalTime = totalTime + timeInterval;
 
 				while (SDL_PollEvent(&event))
@@ -72,36 +67,31 @@ class Arcade::Scene {
 						isRunning = false;
 				}
 
-				// for fun
-				/*for (int i = 0; i < objectCount; i++) {
-					if (i % 2 == 0) {
-						objects[i].motion.setForce(0, gravity.scalarTransform(objects[i].motion.mass * sin(M_PI / 2 + totalTime))); // s
-					}
-					else {
-						objects[i].motion.setForce(0, gravity.scalarTransform(objects[i].motion.mass * -sin(M_PI / 2 + totalTime))); // 
-					}
-				}*/
-
-				/*for (int i = 0; i < objectCount; i++) {
-					objects[i].motion.setForce(0, gravity.rotate(float(int(100 * totalTime) % 360)));
-				}*/
-
-				for (int i = 0; i < objectCount; i++) {
-					objects[i].motion.setForce(0, objects[i].motion.position.scalarTransform(-1).translate(Vector2{ float(ScreenWidth / 2), float(ScreenHeight / 2) }).scalarTransform(gravity.magnitude()));
-				}
 
 				// do we need to update if timeInterval == 0?
 				if (timeInterval != 0) {
+					if (gravityEnum == 2) {
+						setCentralGravity();
+					}
 					onUpdate(timeInterval);
+					checkCollisions(timeInterval);
 				}
 
-				//isRunning = false;
+				renderFrame();
 
 			}
 		}
 
 		void onUpdate(float timeInterval) {
 
+			// updates all the objects in the scene
+			// with respect to the time passed since last update
+			for (int i = 0; i < objectCount; i++) {
+				objects[i].onUpdate(timeInterval);
+			}
+		}
+
+		void checkCollisions(float timeInterval) {
 			// iterates through each pair of objects
 			// to check for collisions between them
 			for (int i = 0; i < objectCount; i++) {
@@ -109,7 +99,6 @@ class Arcade::Scene {
 					if (i != j) {
 						bool collided = objects[i].checkCollision(objects[j], timeInterval);
 						if (collided) {
-							//cout << "colliding";
 							objects[i].shape.color[0] = 0xFF;
 						}
 						else {
@@ -119,16 +108,12 @@ class Arcade::Scene {
 				}
 			}
 
-			// updates all the objects in the scene
-			// with respect to the time passed since last update
-			for (int i = 0; i < objectCount; i++) {
-				objects[i].onUpdate(timeInterval);
-			}
-
 			for (int i = 0; i < objectCount; i++) {
 				objects[i].checkBounds(ScreenWidth, ScreenHeight);
 			}
+		}
 
+		void renderFrame() {
 			// clears the frame
 			SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xFF);
 			SDL_RenderClear(renderer);
@@ -136,11 +121,13 @@ class Arcade::Scene {
 			// add each object to the frame
 			for (int i = 0; i < objectCount; i++) {
 				renderPolygon(objects[i]);
-				//renderNormals(objects[i]);
-				//renderMotion(objects[i]);
+				if (_renderNormals) {
+					renderNormals(objects[i]);
+				}
+				if (_renderMotion) {
+					renderMotion(objects[i]);
+				}
 			}
-
-			// cout << objects[0].motion.forces[0].toString() << "\t" << objects[1].motion.forces[0].toString() << "\n";
 
 			// renders the frame
 			SDL_RenderPresent(renderer);
@@ -211,9 +198,35 @@ class Arcade::Scene {
 			return;
 		}
 
+		void setGravity() {
+			// add gravity to all the initialized objects
+			for (int i = 0; i < objectCount; i++) {
+				objects[i].motion.setForce(objects[i].motion.gravityIndex, gravity.scalarTransform(objects[i].motion.mass));
+			}
+		}
+
+		void setAltGravity() {
+			// add alternating gravity to all the initialized objects
+			for (int i = 0; i < objectCount; i++) {
+				if (i % 2 == 0) {
+					objects[i].motion.setForce(objects[i].motion.gravityIndex, gravity.scalarTransform(objects[i].motion.mass * 1)); // sin(M_PI / 2 + totalTime)
+				}
+				else {
+					objects[i].motion.setForce(objects[i].motion.gravityIndex, gravity.scalarTransform(objects[i].motion.mass * -1)); // sin(M_PI / 2 + totalTime)
+				}
+			}
+		}
+
+		void setCentralGravity() {
+			for (int i = 0; i < objectCount; i++) {
+				Vector2 centralForce = objects[i].motion.position.scalarTransform(-1).translate(Vector2{ float(ScreenWidth / 2), float(ScreenHeight / 2) }).scalarTransform(gravity.magnitude());
+				objects[i].motion.setForce(objects[i].motion.gravityIndex, centralForce);
+			}
+		}
+
 		Object createSquareObject(
 			float length = 10, 
-			float mass = 1, float bounciness = 0, 
+			float mass = 1, float elasticity = 1,
 			Vector2 position = Vector2{}, Vector2 velocity = Vector2{}, 
 			bool isDynamic = true, bool isSolid = true) {
 			// creates an object with the given shape and motion
@@ -227,7 +240,7 @@ class Arcade::Scene {
 			object.shape.calculateAllNormals();
 
 			// create its motion
-			Motion motion{ mass, bounciness, position, velocity, Vector2{}, isDynamic };
+			Motion motion{ mass, elasticity, position, velocity, Vector2{}, isDynamic };
 			object.motion = motion;
 
 			// add it to the scene
@@ -242,7 +255,7 @@ class Arcade::Scene {
 
 		Object createCircleObject(
 			float length = 10, 
-			float mass = 1, float bounciness = 0, 
+			float mass = 1, float elasticity = 1,
 			Vector2 position = Vector2{}, Vector2 velocity = Vector2{}, 
 			bool isDynamic = true, bool isSolid = true) {
 			// creates an object with the given shape and motion
@@ -256,7 +269,7 @@ class Arcade::Scene {
 			object.shape.calculateAllNormals();
 
 			// create its motion
-			Motion motion{ mass, bounciness, position, velocity, Vector2{}, isDynamic };
+			Motion motion{ mass, elasticity, position, velocity, Vector2{}, isDynamic };
 			object.motion = motion;
 
 			// add it to the scene
@@ -267,7 +280,7 @@ class Arcade::Scene {
 		}
 
 		Object createPolygonObject(int polyCount, float length = 10, 
-			float mass = 1, float bounciness = 0, 
+			float mass = 1, float elasticity = 1,
 			Vector2 position = Vector2{}, Vector2 velocity = Vector2{}, 
 			bool isDynamic = true, bool isSolid = true) {
 			// creates an object with the given shape and motion
@@ -281,7 +294,7 @@ class Arcade::Scene {
 			object.shape.calculateAllNormals();
 
 			// create its motion
-			Motion motion{ mass, bounciness, position, velocity, Vector2{}, isDynamic };
+			Motion motion{ mass, elasticity, position, velocity, Vector2{}, isDynamic };
 			object.motion = motion;
 
 			// add it to the scene
@@ -293,7 +306,7 @@ class Arcade::Scene {
 
 		Object createRectangleObject(
 			float length = 20, float breadth = 10,
-			float mass = 1, float bounciness = 0,
+			float mass = 1, float elasticity = 1,
 			Vector2 position = Vector2{}, Vector2 velocity = Vector2{},
 			bool isDynamic = true, bool isSolid = true) {
 
@@ -308,7 +321,7 @@ class Arcade::Scene {
 			object.shape.calculateAllNormals();
 
 			// create its motion
-			Motion motion{ mass, bounciness, position, velocity, Vector2{}, isDynamic };
+			Motion motion{ mass, elasticity, position, velocity, Vector2{}, isDynamic };
 			object.motion = motion;
 
 			// add it to the scene
@@ -319,42 +332,128 @@ class Arcade::Scene {
 		}
 };
 
-int main() {
+Scene twoBalls(Scene scene, int gravityEnum, float gravityMagnitude, bool _renderNormals, bool _renderMotion) {
+	float size = 50;
+	scene.createCircleObject(size, 1, 0.9,
+		Vector2{ float(ScreenWidth / 2) , float(ScreenHeight / 2) - 150 },
+		Vector2{ 0, 50 }, true, true);
+	scene.createCircleObject(size, 1, 0.9,
+		Vector2{ float(ScreenWidth / 2) , float(ScreenHeight / 2) + 150 },
+		Vector2{ 0, -50 }, true, true);
+	scene._renderNormals = _renderNormals;
+	scene._renderMotion = _renderMotion;
+	scene.gravity = scene.gravity.normalize().scalarTransform(gravityMagnitude);
+	scene.gravityEnum = gravityEnum;
+	return scene;
+};
 
-	Scene scene;
-	/*scene.createCircleObject(50, 1, 0, Vector2{ float(ScreenWidth)/2 + 10, 180 }, Vector2{0, 50}, true, true);
-	scene.objects[0].shape.rotateShape(30);
-	scene.createSquareObject(50, 1, 0, Vector2{ float(ScreenWidth) / 2 - 30, 230 }, Vector2{0, -50}, true, true);
-	scene.objects[1].shape.rotateShape(50);*/
+Scene fivePolyons(Scene scene, int gravityEnum, float gravityMagnitude, bool _renderNormals, bool _renderMotion) {
+	float size = 50;
+	scene.createPolygonObject(6, size, 1, 0.5,
+		Vector2{ float(ScreenWidth / 2) - 70, float(ScreenHeight / 2) - 150 },
+		Vector2{ 0, 50 }, true, true);
+	scene.createPolygonObject(6, size, 1, 0.5,
+		Vector2{ float(ScreenWidth / 2) + 20, float(ScreenHeight / 2) + 150 },
+		Vector2{ 0, 50 }, true, true);
+	scene.createPolygonObject(6, size, 1, 0.5,
+		Vector2{ float(ScreenWidth / 2) + 30, float(ScreenHeight / 2) - 150 },
+		Vector2{ 0, 50 }, true, true);
+	scene.createPolygonObject(6, size, 1, 0.5,
+		Vector2{ float(ScreenWidth / 2) + 100, float(ScreenHeight / 2) + 150 },
+		Vector2{ 0, 50 }, true, true);
+	scene.createPolygonObject(6, size, 1, 0.5,
+		Vector2{ float(ScreenWidth / 2) + 200, float(ScreenHeight / 2) - 150 },
+		Vector2{ 0, 50 }, true, true);
+	scene._renderNormals = _renderNormals;
+	scene._renderMotion = _renderMotion;
+	scene.gravity = scene.gravity.normalize().scalarTransform(gravityMagnitude);
+	scene.gravityEnum = gravityEnum;
+	return scene;
+};
 
-	//scene.createCircleObject(50, 1, 0, Vector2{ float(ScreenWidth) / 2, 100 }, Vector2{0, 50}, true, true);
-	//scene.createCircleObject(50, 1, 0, Vector2{ float(ScreenWidth) / 2, 300 }, Vector2{0, -50}, true, true);
-	//scene.createCircleObject(50, 1, 0, Vector2{ float(ScreenWidth) / 2, 300 }, Vector2{ 0, 0 }, true, true);
+Scene fiftyBalls(Scene scene, int gravityEnum, float gravityMagnitude, bool _renderNormals, bool _renderMotion) {
+	float size = 50;
+	for (int i = 0; i < 50; i++) {
+		scene.createCircleObject(size, 1, 0.5,
+			Vector2{ float(rand() % ScreenWidth), float(ScreenHeight / 2) - 75 + float(rand() % 150) },
+			Vector2{ 0, 50 }, true, true);
+	}
+	scene._renderNormals = _renderNormals;
+	scene._renderMotion = _renderMotion;
+	scene.gravity = scene.gravity.normalize().scalarTransform(gravityMagnitude);
+	scene.gravityEnum = gravityEnum;
+	return scene;
+};
 
+Scene fiftyPolyons(Scene scene, int gravityEnum, float gravityMagnitude, bool _renderNormals, bool _renderMotion) {
+	float size = 50;
+	for (int i = 0; i < 50; i++) {
+		scene.createPolygonObject(6, size, 1, 0.5,
+			Vector2{ float(rand() % ScreenWidth), float(ScreenHeight / 2) - 75 + float(rand() % 150) },
+			Vector2{ 0, 50 }, true, true);
+	}
+	scene._renderNormals = _renderNormals;
+	scene._renderMotion = _renderMotion;
+	scene.gravity = scene.gravity.normalize().scalarTransform(gravityMagnitude);
+	scene.gravityEnum = gravityEnum;
+	return scene;
+};
 
-	for (int i = 0; i < 75; i++) {
+Scene polygonScene(Scene scene, int gravityEnum, float gravityMagnitude, bool _renderNormals, bool _renderMotion) {
+	for (int i = 0; i < 99; i++) {
 		float size = 5 + float(rand() % 15);
-		scene.createPolygonObject(3 + rand() % 12, size, size/10, 0, 
-			Vector2{ float(rand() % ScreenWidth / 2) , float(rand() % ScreenHeight / 2) }, 
+		scene.createPolygonObject(3 + rand() % 45, size, size / 10, 0.9,
+			Vector2{ float(rand() % ScreenWidth) , float(rand() % ScreenHeight) },
 			Vector2{ float(rand() % 200), float(rand() % 200) }, true, true);
 	}
+	scene._renderNormals = _renderNormals;
+	scene._renderMotion = _renderMotion;
+	scene.gravity = scene.gravity.normalize().scalarTransform(gravityMagnitude);
+	scene.gravityEnum = gravityEnum;
+	return scene;
+};
 
-	// these dimensions are in backwards lol
-	// Object leftWall = scene.createRectangleObject(ScreenHeight, 50, 50, 0, Vector2{ float(ScreenWidth) - 30, float(ScreenHeight /2) }, Vector2{ 0, 0 }, true, true);
-	// Object rightWall = scene.createRectangleObject(ScreenHeight, 50, 50, 0, Vector2{ 30, float(ScreenHeight /2) }, Vector2{ 0, 0 }, true, true);
+Scene circularScene(Scene scene, int gravityEnum, float gravityMagnitude, bool _renderNormals, bool _renderMotion) {
+	for (int i = 0; i < 75; i++) {
+		float size = 5 + float(rand() % 15);
+		scene.createCircleObject(size, size / 10, 0.9,
+			Vector2{ float(rand() % ScreenWidth) , float(rand() % ScreenHeight) },
+			Vector2{ float(rand() % 200), float(rand() % 200) }, true, true);
+	}
+	scene._renderNormals = _renderNormals;
+	scene._renderMotion = _renderMotion;
+	scene.gravity = scene.gravity.normalize().scalarTransform(gravityMagnitude);
+	scene.gravityEnum = gravityEnum;
+	return scene;
+};
 
-	// Object topWall = scene.createRectangleObject(50, ScreenWidth, 50, 0, Vector2{ float(ScreenWidth) / 2, float(ScreenHeight) - 30 }, Vector2{ 0, 0 }, false, true);
-	// Object bottomWall = scene.createRectangleObject(50, ScreenWidth, 50, 0, Vector2{ float(ScreenWidth) / 2, 30 }, Vector2{ 0, 0 }, false, true);
 
+int main(int argc, char** argv) {
 
-	// scene.createSquareObject(100, 1, 0, Vector2{ float(ScreenWidth) / 2, 400 }, Vector2{}, false);
+	Scene scene;
+	const char* sceneArg = argv[1];
 
-	//scene.createCircleObject(50, 1, 0, Vector2{ float(ScreenWidth)/2 + 100, 50 }, Vector2{}, true);
-	//scene.createPolygonObject(7, 50, 1, 0, Vector2{ float(ScreenWidth) / 2 + 250, 50 }, Vector2{}, true);
-	// scene.createRectangleObject(50, 100, 1, 0, Vector2{ float(ScreenWidth) / 2 - 250, 50 }, Vector2{}, false);
-
-	//scene.createRectangleObject(20, ScreenWidth * 2, 1, 0, Vector2{ float(ScreenWidth) / 2, 450 }, Vector2{}, false);
-
+	if (sceneArg == "twoBall") {
+		cout << "hello";
+		scene = twoBalls(scene, 1, 100, false, true);
+	}
+	else if (sceneArg == "fivePoly") {
+		scene = fivePolyons(scene, 0, 100, false, false);
+	}
+	else if (sceneArg == "fiftyBall") {
+		scene = fiftyBalls(scene, 1, 100, false, false);
+	}
+	else if (sceneArg == "fiftyPoly") {
+		scene = fiftyPolyons(scene, 0, 100, false, false);
+	}
+	else if (sceneArg == "manyPoly") {
+		scene = polygonScene(scene, 2, 100, false, false);
+	}
+	else if (sceneArg == "manyBall") {
+		scene = circularScene(scene, 2, 100, false, false);
+	}
+	
+	cout << sceneArg << "\n";
 	cout << scene.objectCount << "\n";
 
 	scene.run();

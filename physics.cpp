@@ -83,6 +83,7 @@ class Physics::Shape {
 		SDL_Point normalPoints[100];
 		int polyCount;
 		unsigned char color[4] = { 0x00, 0xFF, 0x00, 0xFF };
+		bool isCircle = false;
 
 		void calculateAllNormals() {
 			for (int i = 0; i < polyCount; i++) {
@@ -103,7 +104,8 @@ class Physics::Shape {
 		}
 
 		void createCircle() {
-			createRegularPolygon(15);
+			createRegularPolygon(49);
+			isCircle = true;
 		}
 
 		int createRegularPolygon(int _polyCount) {
@@ -184,7 +186,7 @@ class Physics::Motion {
 
 	public:
 		float mass = 1;
-		float bounciness;
+		float elasticity = 1;
 		Vector2 position;
 		Vector2 velocity;
 		Vector2 acceleration;
@@ -192,6 +194,8 @@ class Physics::Motion {
 	// protected:
 		Vector2 forces[50];
 		int forceCount;
+		int gravityIndex = 0;
+		int collisionIndex = 1;
 
 		Vector2 setPosition(Vector2 newPosition) {
 			// sets the position of this motion
@@ -222,18 +226,19 @@ class Physics::Motion {
 			// add a force to act on this motion
 			forces[forceCount] = newForce;
 			forceCount++;
-			cout << "Adding a force" << "\n";
-			cout << forceCount << "\n";
 			return forceCount;
 		}
 
 		// check this works properly
 		int removeForce(int forceIndex) {
 			// remove a forcing acting on this motion
-			for (int i = forceIndex; i < forceCount-1; i++) {
+			/*for (int i = forceIndex; i < forceCount-1; i++) {
 				forces[i] = forces[i+1];
 			}
-			forceCount = forceCount - 1;
+			forceCount = forceCount - 1;*/
+
+			forces[forceIndex] = Vector2{ 0, 0 };
+
 			return forceCount;
 		}
 
